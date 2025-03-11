@@ -1,0 +1,29 @@
+cabal-version:      3.0
+name:               agda-forester-backend
+version:            0.1.0.0
+-- synopsis:
+-- description:
+license:            BSD-3-Clause
+license-file:       LICENSE
+author:             Samuel Toth
+maintainer:         psyst8@nottingham.ac.uk
+-- copyright:
+build-type:         Simple
+extra-doc-files:    CHANGELOG.md
+-- extra-source-files:
+
+common warnings
+    ghc-options: -Wall
+
+library
+    import:           warnings
+    exposed-modules:  MyLib, Backend
+    other-modules:    Forester
+    -- other-extensions:
+    build-depends:    base ^>=4.20.0.0,
+                      Agda,
+                      containers,
+                      unordered-containers,
+                      text
+    hs-source-dirs:   src
+    default-language: Haskell2010
