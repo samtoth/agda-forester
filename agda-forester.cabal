@@ -17,7 +17,7 @@ common warnings
 library
     import:           warnings
     exposed-modules:  Forester.Backend, Forester.Main
-    other-modules:    Forester.Forester, Forester.Structured, Forester.Base
+    other-modules:    Forester.Forester, Forester.Structured, Forester.Base, Forester.Html
     -- other-extensions:
     build-depends:    base ^>=4.20.0.0,
                       Agda,

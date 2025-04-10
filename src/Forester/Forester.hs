@@ -9,7 +9,6 @@ module Forester.Forester
 
 import Data.Text (Text)
 import Agda.Syntax.Common.Pretty
-import qualified Data.Text as T
 
 data Tree = Tree
     { treeId :: Maybe Text -- ^ Nothing for anonymouse subtrees
