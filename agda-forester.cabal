@@ -1,0 +1,42 @@
+cabal-version:      3.0
+name:               agda-forester
+version:            0.1.0.0
+-- synopsis:
+-- description:
+license:            BSD-3-Clause
+license-file:       LICENSE
+author:             Samuel Toth
+maintainer:         psyst8@nottingham.ac.uk
+-- copyright:
+build-type:         Simple
+-- extra-source-files:
+
+common warnings
+    ghc-options: -Wall
+
+library
+    import:           warnings
+    exposed-modules:  Forester.Backend, Forester.Main
+    other-modules:    Forester.Forester, Forester.Structured, Forester.Base
+    -- other-extensions:
+    build-depends:    base ^>=4.20.0.0,
+                      Agda,
+                      containers,
+                      unordered-containers,
+                      deepseq,
+                      split,
+                      text,
+                      filepath,
+                      blaze-html,
+                      uri-encode
+    hs-source-dirs:   src
+    default-language: Haskell2010
+
+
+executable agda-forester
+  hs-source-dirs:      app
+  main-is:             Main.hs
+  ghc-options:         -threaded -rtsopts -with-rtsopts=-N
+  build-depends:       base
+                     , agda-forester
+  default-language:    Haskell2010
