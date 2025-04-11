@@ -51,14 +51,11 @@ data HtmlInputSourceFile = HtmlInputSourceFile
   deriving Show
 
 
+renderAgda :: TopLevelModuleName -> [TokenInfo] -> T.Text
+renderAgda tlname ts = renderHtml (page False tlname (code False AgdaFileType ts))
+
 srcFileOfInterface :: TopLevelModuleName -> Interface -> HtmlInputSourceFile
 srcFileOfInterface m i = HtmlInputSourceFile m (iFileType i) (iSource i) (iHighlighting i)
-
--- | Converts module names to the corresponding HTML file names.
-
-modToFile :: TopLevelModuleName -> String -> FilePath
-modToFile m ext = Network.URI.Encode.encode $ render (pretty m) <.> ext
-
 
 -- | Split a token stream into definitions
 

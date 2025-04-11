@@ -6,30 +6,45 @@ module Forester.Backend
 
 import Control.Monad.IO.Class
 import Data.HashMap.Strict (HashMap)
+import qualified Data.HashMap.Strict as HM
 import qualified Data.Map.Strict as Map
 import Data.IORef
 import Data.Text (Text, pack, unpack)
+import qualified Data.Text.Lazy as T
 import Control.DeepSeq
 import GHC.Generics
 import System.FilePath
-import Data.Bifunctor (first, second)
+import System.Process
 
 import Agda.Compiler.Backend hiding (topLevelModuleName, Name, Constructor)
 import Agda.Compiler.Common
 import Agda.Syntax.Common.Pretty
+import Agda.Syntax.Common (FileType(..))
+import Agda.Interaction.Highlighting.Precise (HighlightingInfo)
 import Agda.Interaction.Options (ArgDescr(..), OptDescr(..))
 import Agda.Utils.Monad (join)
 import Agda.Utils.Maybe (isJust)
+import Agda.Utils.Impossible
 
 import Forester.Forester
 import Forester.Base
 import Forester.Structured
 import Forester.Html
+import qualified Agda.Utils.IO.UTF8 as UTF8
+
+import qualified Agda.Interaction.JSON as JSON
+import qualified Data.Aeson.Types as JSON
+import qualified Data.Aeson.KeyMap as JSON
+import qualified Data.Aeson.Key as JSON
+import Data.Foldable (toList)
+
+-- import qualified Agda.Interaction.
 
 
 data ForesterOpts = Opts
   { optsEnabled :: Bool
   , optsTreeDir :: FilePath
+  , optsHtmlDir :: FilePath
   , optsStructured :: FStructured
   } deriving (Generic, NFData)
 
@@ -37,16 +52,19 @@ defaultOps :: ForesterOpts
 defaultOps = Opts 
   { optsEnabled = False
   , optsTreeDir = "trees"
-  , optsStructured = Html
+  , optsHtmlDir = "assets/html"
+  , optsStructured = FSNone
   }
 
 data ForesterIdent = ForesterIdent
 
 data CompEnv = CompEnv {
     compileEnvOpts     :: ForesterOpts
+  , compileForestData  :: IORef (HashMap Text Text)
   , compileTypes       :: IORef (HashMap Text ForesterIdent)
     -- ^ Hashmap from anchor→identifier for finding types while emitting
     -- HTML, and for search after
+  , compileMods        :: IORef (HashMap TopLevelModuleName FileType)
     }
 
 data ModuleEnv = ModuleEnv
@@ -100,19 +118,38 @@ fFlags :: [OptDescr (Flag (ForesterOpts))]
 fFlags = 
   [ Option [] ["forest"] (NoArg $ \o -> return o{optsEnabled = True}) "Generate a forest"
   , Option ['o'] ["forest-dir"] (OptArg (\r o -> case r of
-       Just r -> return o{optsTreeDir = r}
-       Nothing -> return o) "DIR") "directory in which tree files are paced (default: trees)"
+       Just d -> return o{optsTreeDir = d}
+       Nothing -> return o) "DIR") "directory in which tree files are written (default: trees)"
   , Option ['S'] ["structured"] (OptArg (\r o -> case r of 
-      Just "0" -> return o{optsStructured = Html}
-      Just "1" -> return o{optsStructured = Semi}
-      Just "2" -> return o{optsStructured = Full}
+      Just "0" -> return o{optsStructured = FSNone}
+      Just "1" -> return o{optsStructured = FSSemi}
+      Just "2" -> return o{optsStructured = FSFull}
       _ -> return o) "LEVEL") "How should we proccess plain agda files?\n0 = Just emit html and a module tree linking to it\n1 = Emit module tree with highlighted source and definition trees linking to source\n2 = Fully forestify the agda code"
+  , Option [] ["html-dir"] (OptArg (\r o -> case r of
+      Just d -> return o{optsHtmlDir = d}
+      Nothing -> return o) "DIR") "director in which html files are written (default: assets/html)"
   ]
 
 foresterPreCompile :: (Monad m, MonadIO m) => ForesterOpts -> m CompEnv
 foresterPreCompile (flgs)= do
     types <- liftIO (newIORef mempty)
-    pure $ CompEnv flgs types
+    mods <- liftIO (newIORef mempty)
+    json <- liftIO $ readProcess "forester" ["query", "all", "proxy.toml"] []
+    let (Just (JSON.Object val)) = JSON.decodeStrictText  @JSON.Value (pack json)
+    let metas :: JSON.Value -> [Text]
+        metas (JSON.Object v) = case v JSON.!? "metas" of
+          Just (JSON.Object m) -> case m JSON.!? "defines" of
+            Just (JSON.String ds') -> let
+                 ds = read @[String] (unpack ds')
+              in fmap pack ds
+            _ -> []
+          _ -> []
+        metas _ = []
+    let val' :: [(Text,Text)]
+        val' = join $ fmap (\(k,v) -> (,) <$> metas v <*> pure (JSON.toText k)) (JSON.toList val)
+    defs <- liftIO $ newIORef (HM.fromList val')
+    liftIO.putStrLn.show $ val'
+    pure $ CompEnv flgs defs types mods
      
 
 foresterPreModule :: (ReadTCState m)
@@ -122,7 +159,6 @@ foresterPreModule :: (ReadTCState m)
                   -> Maybe FilePath
                   -> m (Recompile ModuleEnv ForesterModule)
 foresterPreModule cenv _main tlmname _mfp = do
-    -- interface <- curIF
     pure $ Recompile (ModuleEnv cenv tlmname)
 -- ^ TODO: Selectively recompile only changed modules 
 
@@ -131,7 +167,7 @@ foresterPreModule cenv _main tlmname _mfp = do
 foresterCompileDef :: CompEnv
                    -> ModuleEnv
                    -> IsMain 
-                   -> Definition 
+                   -> Definition
                    -> TCMT IO (Maybe ForesterDef)
 foresterCompileDef cenv mn _ def = do
   let defnName = render . pretty . qnameName . defName $ def
@@ -166,34 +202,51 @@ foresterPostModule :: CompEnv
                     -> TopLevelModuleName
                     -> [Maybe ForesterDef]
                     -> TCMT IO ForesterModule
-foresterPostModule cenv menv main tlname defs' = do
+foresterPostModule cenv menv _main tlname defs' = do
   let defs = join . fmap (maybe [] (:[])) $ defs'
   (HtmlInputSourceFile _ ftype src hinfo) <- srcFileOfInterface tlname <$> curIF
+  liftIO $ modifyIORef (compileMods cenv) (HM.insert tlname ftype)
+  hm <- liftIO $ readIORef (compileMods cenv)
+  ds <- liftIO $ readIORef (compileForestData cenv)
+  case ftype of
+    AgdaFileType -> do
+      let strat = optsStructured.compileEnvOpts $ cenv
+      case strat of
+        FSNone -> do
+          let content = renderAgda tlname (tokenStream src hinfo)
+          let root = (optsHtmlDir . compileEnvOpts $ cenv )
+          liftIO $ UTF8.writeTextToFile (root </> render (pretty tlname) <.> "html") $ content
+        FSSemi -> __IMPOSSIBLE__ -- TODOTODOTODO!!@!!!!!!@!@!@!@!!
+        FSFull -> compileModStructured cenv tlname src hinfo defs
+    TreeFileType -> do
+      let content = codeTree ds hm (tokenStream src hinfo)
+      let root = (optsTreeDir . compileEnvOpts $ cenv )
+      liftIO $ UTF8.writeTextToFile (root </> render (pretty tlname) <.> "tree") $ T.pack $ content
+    _ -> __IMPOSSIBLE__
+  return $ ForesterModule mempty
+
+
+
+compileModStructured :: CompEnv -> TopLevelModuleName -> T.Text -> HighlightingInfo -> [ForesterDef] -> TCMT IO ()
+compileModStructured cenv tlname src hinfo defs = do
   let defToks = splitDef $ tokenStream src hinfo 
   submods <- curIF >>= \mi -> createModTree tlname (iModuleName mi) defs (_sigSections . iSignature $ mi) defToks
   liftIO . putStrLn . render . pretty $ submods
-  -- let defTrees = fmap (\fdef
-  --       -> (foresterDefId fdef, definitionTree fdef (fromMaybe [] $ lookup (fmap unpack $ title $ foresterDefTree fdef) defToks)))
-  --         defs
-  -- mTree <- createTree tlname <$> curIF <*> pure (snd . head $ defToks) <*> pure (fmap snd defTrees)
-  -- liftIO . putStrLn $ show (length defs) <> " defs in this module"
-
   let filePathRoot = (optsTreeDir . compileEnvOpts $ cenv )
-  _ <- realiseModTree filePathRoot submods
-  -- forM_ defTrees $ \(n,t) -> do
-  --   liftIO $ UFT8.writeTextToFile (filePathRoot </> Ts.unpack n <.> "tree") $ T.pack . render . pretty $ t
-  --   pure ()
-  -- liftIO $ putStrLn $ "Inside module: " <> (render . pretty $ tlname)
-  -- let filePath = filePathRoot </> (render . pretty $ tlname)
-  -- liftIO $ UTF8.writeTextToFile (filePath <.> "tree") $ T.pack . render . pretty $ mTree
-  -- liftIO $ UTF8.writeTextToFile (filePath <.> "html") $ renderHtml $ page False tlname (code False AgdaFileType (tokenStream src hinfo))
-  liftIO . putStrLn . render . pretty {-. fmap (fmap (pretty . second (show.renderHtml))) -}.
-             fmap (first show . second (const @String "...")) . splitDef $ tokenStream src hinfo 
-  -- :: Bool     -- ^ Whether to generate non-code contents as-is
-  --    -> FileType -- ^ Source file type
-  --    -> [TokenInfo]
-  --    -> Html
-  pure $ ForesterModule mempty
+  hm <- liftIO $ readIORef (compileMods cenv)
+  ds <- liftIO $ readIORef (compileForestData cenv)
+  _ <- realiseModTree ds hm filePathRoot submods
+  return ()
+
+foresterPostCompile :: CompEnv
+                    -> IsMain
+                    -> Map.Map TopLevelModuleName ForesterModule
+                    -> TCMT IO ()
+foresterPostCompile cenv main mods = pure ()
+
+
+
+
 
 -- definitionAnchor :: Definition -> Maybe Text
 -- definitionAnchor def | defCopy def = Nothing
@@ -208,14 +261,4 @@ foresterPostModule cenv menv main tlname defs' = do
 --     case rStart (nameBindingSite (qnameName (defName def))) of
 --       Just pn -> pure $ Text.pack (modn <> "#" <> show (posPos pn))
 --       Nothing -> Nothing
-
-
-foresterPostCompile :: CompEnv
-                    -> IsMain
-                    -> Map.Map TopLevelModuleName ForesterModule
-                    -> TCMT IO ()
-foresterPostCompile cenv main mods = pure ()
-
-
-
 

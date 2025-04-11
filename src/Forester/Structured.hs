@@ -27,11 +27,13 @@ import Control.DeepSeq
 
 import Forester.Base
 import Forester.Forester
+import Data.HashMap.Strict (HashMap)
+import Agda.Syntax.Common (FileType)
 
 data FStructured
-  = Html
-  | Semi
-  | Full
+  = FSNone
+  | FSSemi
+  | FSFull
   deriving (Generic, NFData)
 
 data Mod
@@ -113,19 +115,18 @@ createModTree tlname mn@(MName nms) defs secs code
 
 
 
-realiseModTree :: FilePath -> Mod -> TCMT IO Tree
-realiseModTree root (DataMod   mname toks defs) = return emptyTree {treeId = Just . pack.render . pretty $ mname}
-realiseModTree root (RecordMod mname toks defs) = return emptyTree {treeId = Just . pack.render . pretty $ mname}
-realiseModTree root (SubMods mname imps preamble smods defs) = do
+realiseModTree :: HashMap Text Text -> HashMap TopLevelModuleName FileType -> FilePath -> Mod -> TCMT IO Tree
+realiseModTree _ _ root (DataMod   mname toks defs) = return emptyTree {treeId = Just . pack.render . pretty $ mname}
+realiseModTree _ _ root (RecordMod mname toks defs) = return emptyTree {treeId = Just . pack.render . pretty $ mname}
+realiseModTree ds hm root (SubMods mname imps preamble smods defs) = do
   let defTrees :: [(Text, Tree)]
-      defTrees = ((foresterDefId . fst) /\ uncurry definitionTree) <$> defs
-
+      defTrees = ((foresterDefId . fst) /\ uncurry (definitionTree ds hm)) <$> defs
   forM_ defTrees $ \(fp, t) -> do
     liftIO $ UTF8.writeTextToFile (root </> unpack fp <.> "tree") $ T.pack . render . pretty $ t
 
-  subtrees <- mapM (realiseModTree root) smods
+  subtrees <- mapM (realiseModTree ds hm root) smods
 
-  let tlTree = createTree mname imps preamble (fmap snd defTrees ++ subtrees)
+  let tlTree = createTree ds hm mname imps preamble (fmap snd defTrees ++ subtrees)
 
   liftIO $ UTF8.writeTextToFile (root </> render (pretty mname) <.> "tree") $ T.pack . render . pretty $ tlTree
 
