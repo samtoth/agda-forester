@@ -13,6 +13,6 @@ let
             buildInputs = (old.buildInputs or []) ++ [
                 pkgs.forester
             ];
-        };
+        };    
     };
-in agdaForester
+in agdaForester // {passthru = agdaForester.passthru // {forest = pkgs.forester;};} 
