@@ -9,6 +9,7 @@ in pkgs.mkShell {
 
     buildInputs = [
         drv
+        pkgs.forester
     ];
 
     shellHook = ''

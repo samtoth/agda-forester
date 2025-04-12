@@ -10,7 +10,7 @@ let
   agdaForester = hsPkgs.callCabal2nix "agda-forester" ./. {} //
     {
         overrideAttributes = old: {
-            nativeBuildInputs = (old.nativeBuildInputs or []) ++ [
+            buildInputs = (old.buildInputs or []) ++ [
                 pkgs.forester
             ];
         };
