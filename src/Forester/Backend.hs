@@ -231,6 +231,7 @@ foresterPostModule cenv menv _main tlname defs' = do
       let content = codeTree ds hm (tokenStream src hinfo)
       let root = (optsTreeDir . compileEnvOpts $ cenv )
       liftIO $ UTF8.writeTextToFile (root </> render (pretty tlname) <.> "tree") $ T.pack $ content
+      liftIO $ putStrLn $ "Written " <> render (pretty tlname) <> " to " <> (root </> render (pretty tlname) <.> "tree")
     _ -> __IMPOSSIBLE__
   return $ ForesterModule mempty
 
