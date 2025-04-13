@@ -37,6 +37,7 @@ import qualified Data.Aeson.Types as JSON
 import qualified Data.Aeson.KeyMap as JSON
 import qualified Data.Aeson.Key as JSON
 import Data.Foldable (toList)
+import Text.Read (readMaybe)
 
 -- import qualified Agda.Interaction.
 
@@ -135,12 +136,20 @@ foresterPreCompile (flgs)= do
     types <- liftIO (newIORef mempty)
     mods <- liftIO (newIORef mempty)
     json <- liftIO $ readProcess "forester" ["query", "all", "proxy.toml"] []
-    let (Just (JSON.Object val)) = JSON.decodeStrictText  @JSON.Value (pack json)
+    val <- case JSON.decodeStrictText  @JSON.Value (pack json) of
+      Just (JSON.Object val) -> return val
+      _ -> do
+        liftIO $ putStrLn $ json
+        liftIO $ putStrLn $ "For now we are just stopping - this should become a recoverable error in the future"
+        error $ "Error reading forester query output"
+
     let metas :: JSON.Value -> [Text]
         metas (JSON.Object v) = case v JSON.!? "metas" of
           Just (JSON.Object m) -> case m JSON.!? "defines" of
             Just (JSON.String ds') -> let
-                 ds = read @[String] (unpack ds')
+                ds = case readMaybe @[String] (unpack ds') of
+                        Just a -> a
+                        Nothing -> error "Couldn't read String list from 'defines' meta"
               in fmap pack ds
             _ -> []
           _ -> []
