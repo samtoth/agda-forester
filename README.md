@@ -45,7 +45,7 @@ For a tree that contains the agda definitions `zero`, `suc` and `_+_`, you would
 
 In addition, to get module links working, you need to add the following to the top level tree:
 ```
-\meta{defines}{\startverb ["MODULENAME"] \stopverb}
+\meta{module}{\startverb MODULENAME \stopverb}
 ```
 
 ## Structure flag

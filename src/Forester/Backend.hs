@@ -38,6 +38,7 @@ import qualified Data.Aeson.KeyMap as JSON
 import qualified Data.Aeson.Key as JSON
 import Data.Foldable (toList)
 import Text.Read (readMaybe)
+import Data.Maybe (fromMaybe)
 
 -- import qualified Agda.Interaction.
 
@@ -154,10 +155,21 @@ foresterPreCompile (flgs)= do
             _ -> []
           _ -> []
         metas _ = []
+
+        moduleNm :: JSON.Value -> Maybe Text
+        moduleNm (JSON.Object v) = case v JSON.!? "metas" of
+          Just (JSON.Object m) -> case m JSON.!? "module" of
+            Just (JSON.String ds) -> Just ds
+            _ -> Nothing
+          _ -> Nothing
+        moduleNm _ = Nothing
     let val' :: [(Text,Text)]
-        val' = join $ fmap (\(k,v) -> (,) <$> metas v <*> pure (JSON.toText k)) (JSON.toList val)
-    defs <- liftIO $ newIORef (HM.fromList val')
-    liftIO.putStrLn.show $ val'
+        val' = join $ fmap (\(k,v) -> (,) <$> metas v <*> pure (fromMaybe (JSON.toText k) (moduleNm v))) (JSON.toList val)
+        diagonal a = (a,a)
+        mods' :: [(Text,Text)]
+        mods' = join $ fmap (toList . fmap diagonal . moduleNm . snd) (JSON.toList val)
+    defs <- liftIO $ newIORef (HM.fromList (val' ++ mods'))
+    liftIO.putStrLn.show $ val' <> mods'
     pure $ CompEnv flgs defs types mods
      
 
