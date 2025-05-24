@@ -1,10 +1,9 @@
 args: import (builtins.fetchTarball {
   name   = "nixpkgs";
-  url    = "https://github.com/nixos/nixpkgs/archive/c4265ec26dbd5222134be32a2eb10b09e345653e.tar.gz";
-  sha256 = "sha256:082g44zybznp148bgs31davi2p83xxal1025k3410zh27x30daps";
+  url    = "https://github.com/nixos/nixpkgs/archive/11cb3517b3af6af300dd6c055aeda73c9bf52c48.tar.gz";
+  sha256 = "sha256:1915r28xc4znrh2vf4rrjnxldw2imysz819gzhk9qlrkqanmfsxd";
 }) ({
   overlays = [
     (import ./haskell-packages.nix)
-    (import ./forester.nix)
     ];
 } // args)
