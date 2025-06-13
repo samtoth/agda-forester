@@ -1,7 +1,7 @@
  # Agda backend for [Forester](https://www.forester-notes.org/)
 
 This is an experimental project implementing a backend to export
-literate agda to forrester trees.
+literate agda to forester trees.
 
 ## Building
 
@@ -30,7 +30,7 @@ You will also require that the macros defined in [./macros.tree](./macros.tree) 
 
 For the code to be styled correctly, you also need to have the `Agda.css` file included in your header somewhere. 
 
-For an example of how to structure a project check out [this project](https://github.com/samtoth/synthetic-agda)
+For an example of how to structure a project check out [this project](https://github.com/samtoth/agda-synthetic-categories)
 
 ## Enabling links
 
@@ -58,7 +58,7 @@ The partial implementation of this automatic tree generation is still left in th
 
 Currently the default way to deal with non literate agda files is to simply use the html backend. This corresponds to the flag `-S0` which is set by default.
 
-## Future plans
+## Future plans
 
 Some potential ideas for augmenting the forester output:
 
@@ -67,3 +67,4 @@ Some potential ideas for augmenting the forester output:
  - [ ] Auto generate the meta-defines to reduce the burdon of writing literate files
  - [ ] Auto generate type information as forest tree metadata
  - [ ] Implement some kind of type directed search using the above type information. (In particular, maybe translating types into agda-unimath style names that can be searched)
+ - [ ] Migrate to Forester version 5
