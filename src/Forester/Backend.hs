@@ -221,7 +221,7 @@ foresterPostModule cenv menv _main tlname defs' = do
       let res = JSON.eitherDecode (T.encodeUtf8 . T.pack $ treelistOutput)
       cs <- case res of 
         Right a -> pure a
-        Left err -> error $ "Unexpected failure to read treelist output: \n" <> err
+        Left err -> error $ "Unexpected failure to read treelist output (" <> err <> "):\n" <> treelistOutput
       liftIO $ modifyIORef (compileMods cenv) (HM.insert (pack.render.pretty$tlname) (ftype, cs))
       hm <- liftIO $ readIORef (compileMods cenv)
       ds <- liftIO $ readIORef (compileForestData cenv)

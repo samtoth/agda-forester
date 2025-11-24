@@ -42,6 +42,6 @@ let ()
         | Ok t        ->  (match (List.nth t 0).loc with
             | Some src -> let a = create_interval_tree "" src t 
                           in print_endline (Yojson.Safe.to_string (`List (List.map yojson_of_intervalTree a.children)))
-            | _ -> print_endline "error")
-        | Error _ -> print_endline "error")
+            | _ -> print_endline "[]")
+        | Error e -> emit_diagnostic e)
 
