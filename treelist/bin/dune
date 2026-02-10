@@ -1,5 +1,0 @@
-(executable
- (public_name treelist)
- (name main)
- (preprocess (pps ppx_deriving.show ppx_deriving.ord ppx_yojson_conv))
- (libraries stdio forester.core forester.compiler))

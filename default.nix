@@ -33,7 +33,7 @@ let
   };
   myForester' = myForester.overrideScope overlay;
 
-  treelist = builtins.getFlake (toString ./treelist);
+  treelist = builtins.getFlake "github:samtoth/treelist";
 
   hsPkgs = pkgs.ourHaskellPackages;
   agdaForester = (hsPkgs.callCabal2nix "agda-forester" ./. {}).overrideAttrs(old: {
