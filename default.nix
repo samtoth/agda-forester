@@ -6,7 +6,8 @@
 }:
 let
   pkgs = import ./nix/nixpkgs.nix { inherit system; };
-  forester = builtins.getFlake "sourcehut:~jonsterling/ocaml-forester?rev=58af4f74e009655999302e63c9c58f9640c262ad";
+  forester = builtins.getFlake "sourcehut:~jonsterling/ocaml-forester?tag=5.0";
+
 
   myForester = forester.legacyPackages.${system};
 
