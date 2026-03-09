@@ -50,6 +50,7 @@ let
             propagatedBuildInputs = (old.propagatedBuildInputs or [])
                                     ++ [ myForester'.forester
                                          treelist.legacyPackages.${system}.treelist
+                                         hsPkgs.Agda
                                        ];
         }
   );
