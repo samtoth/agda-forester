@@ -231,8 +231,6 @@ foresterPostModule cenv menv _main tlname defs' = do
       let content = renderAgda (optsHtmlCssPath . compileEnvOpts $ cenv)
                                (optsForestRoot . compileEnvOpts $ cenv)
                                tlname hm (tokenStream src hinfo)
-                    -- TODO: Links are broken for this - they always point to html, even
-                    --       if literate
       let root = (optsHtmlDir . compileEnvOpts $ cenv )
       liftIO $ UTF8.writeTextToFile (root </> render (pretty tlname) <.> "html") $ content
       liftIO $ putStrLn $ "Written " <> render (pretty tlname) <> " to " <> (root </> render (pretty tlname) <.> "html")
