@@ -53,8 +53,8 @@ data HtmlInputSourceFile = HtmlInputSourceFile
   deriving Show
 
 
-renderAgda :: TopLevelModuleName -> [TokenInfo] -> T.Text
-renderAgda tlname ts = renderHtml (page False tlname (code False AgdaFileType ts))
+renderAgda :: FilePath -> TopLevelModuleName -> [TokenInfo] -> T.Text
+renderAgda cssPath tlname ts = renderHtml (page False tlname cssPath (code False AgdaFileType ts))
 
 srcFileOfInterface :: TopLevelModuleName -> Interface -> HtmlInputSourceFile
 srcFileOfInterface m i = HtmlInputSourceFile m (iFileType i) (iSource i) (iHighlighting i)
@@ -70,11 +70,12 @@ h !! as = h ! mconcat as
 -- | Constructs the web page, including headers.
 
 page
-  :: Bool                  -- ^ Whether to reserve literate
+  :: Bool                -- ^ Whether to reserve literate
   -> TopLevelModuleName  -- ^ Module to be highlighted.
+  -> FilePath            -- ^ Agda css file
   -> Html
   -> Html
-page htmlHighlight modName pageContent =
+page htmlHighlight modName cssPath pageContent =
   if htmlHighlight
     then pageContent
     else Html5.docTypeHtml $ hdr <> rest
@@ -84,9 +85,8 @@ page htmlHighlight modName pageContent =
       [ Html5.meta !! [ Attr.charset "utf-8" ]
       , Html5.title (toHtml . render $ pretty modName)
       , Html5.link !! [ Attr.rel "stylesheet"
-                      , Attr.href $ stringValue "Agda.css"
+                      , Attr.href $ stringValue cssPath
                       ]
-      
       ]
 
     rest = Html5.body $ (Html5.pre ! Attr.class_ "Agda") pageContent

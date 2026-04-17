@@ -55,6 +55,8 @@ data ForesterOpts = Opts
   { optsEnabled :: Bool
   , optsTreeDir :: FilePath
   , optsHtmlDir :: FilePath
+  , optsHtmlLinkRoot :: FilePath
+  , optsHtmlCssPath :: FilePath
   -- , optsStructured :: FStructured
   } deriving (Generic, NFData)
 
@@ -63,6 +65,8 @@ defaultOps = Opts
   { optsEnabled = False
   , optsTreeDir = "trees"
   , optsHtmlDir = "assets/html"
+  , optsHtmlLinkRoot = "/html/"
+  , optsHtmlCssPath = "Agda.css"
   -- , optsStructured = FSNone
   }
 
@@ -130,11 +134,18 @@ fFlags =
   , Option [] ["fhtml-dir"] (OptArg (\r o -> case r of
       Just d -> return o{optsHtmlDir = d}
       Nothing -> return o) "DIR") "directory in which forester HTML files are written (default: assets/html)"
+  , Option [] ["fhtml-link-root"] (OptArg (\r o -> case r of
+      Just d -> return o{optsHtmlLinkRoot = d}
+      Nothing -> return o) "DIR") "root of HTML links in generated tree files (default: /html/)"
+  , Option [] ["fhtml-css-path"] (OptArg (\r o -> case r of
+      Just d -> return o{optsHtmlCssPath = d}
+      Nothing -> return o) "DIR") "Path to css file in HTML files (default: Agda.css)"
   ]
+
 
 foresterPreCompile :: ForesterOpts -> TCMT IO CompEnv
 foresterPreCompile flgs = do
-    types <- liftIO $ newIORef mempty -- types' 
+    types <- liftIO $ newIORef mempty -- types'
 
     mods' <- liftIO (doesFileExist "forest-map.json") >>= \case
       False -> pure mempty
@@ -212,20 +223,23 @@ foresterPostModule cenv menv _main tlname defs' = do
       liftIO $ modifyIORef (compileMods cenv) (HM.insert (pack.render.pretty$tlname) (ftype, []))
       hm <- liftIO $ readIORef (compileMods cenv)
       ds <- liftIO $ readIORef (compileForestData cenv)
-      let content = renderAgda tlname (tokenStream src hinfo) -- TODO: Links are broken for this - they always point ...html
+      let content = renderAgda (optsHtmlCssPath . compileEnvOpts $ cenv)
+                               tlname (tokenStream src hinfo)
+                    -- TODO: Links are broken for this - they always point to html, even
+                    --       if literate
       let root = (optsHtmlDir . compileEnvOpts $ cenv )
       liftIO $ UTF8.writeTextToFile (root </> render (pretty tlname) <.> "html") $ content
       liftIO $ putStrLn $ "Written " <> render (pretty tlname) <> " to " <> (root </> render (pretty tlname) <.> "html")
     TreeFileType -> do
       treelistOutput <- liftIO $ readProcess "treelist" [T.unpack src] []
       let res = JSON.eitherDecode (T.encodeUtf8 . T.pack $ treelistOutput)
-      cs <- case res of 
+      cs <- case res of
         Right a -> pure a
         Left err -> error $ "Unexpected failure to read treelist output (" <> err <> "):\n" <> treelistOutput
       liftIO $ modifyIORef (compileMods cenv) (HM.insert (pack.render.pretty$tlname) (ftype, cs))
       hm <- liftIO $ readIORef (compileMods cenv)
       ds <- liftIO $ readIORef (compileForestData cenv)
-      let content = codeTree ds hm (tokenStream src hinfo)
+      let content = codeTree (optsHtmlLinkRoot . compileEnvOpts $ cenv) ds hm (tokenStream src hinfo)
       let root = (optsTreeDir . compileEnvOpts $ cenv )
       liftIO $ UTF8.writeTextToFile (root </> render (pretty tlname) <.> "tree") $ T.pack $ content
       liftIO $ putStrLn $ "Written " <> render (pretty tlname) <> " to " <> (root </> render (pretty tlname) <.> "tree")
