@@ -3,6 +3,7 @@ module Forester.Html where
 
 import Prelude hiding ((!!))
 import qualified Data.Text.Lazy as T
+import Data.Text (Text, pack, unpack)
 import System.FilePath
 import Data.List.Split
 import Data.Foldable (toList)
@@ -35,9 +36,10 @@ import qualified Text.Blaze.Html5 as Html5
 import qualified Text.Blaze.Html5.Attributes as Attr
 import Text.Blaze.Html.Renderer.Text (renderHtml)
 
+import qualified Data.HashMap.Strict as HM
 
 import Forester.Base
-
+import Forester.Data
 
 -- | Internal type bundling the information related to a module source file
 
@@ -53,8 +55,9 @@ data HtmlInputSourceFile = HtmlInputSourceFile
   deriving Show
 
 
-renderAgda :: FilePath -> TopLevelModuleName -> [TokenInfo] -> T.Text
-renderAgda cssPath tlname ts = renderHtml (page False tlname cssPath (code False AgdaFileType ts))
+renderAgda :: FilePath -> FilePath -> TopLevelModuleName -> ModuleData -> [TokenInfo] -> T.Text
+renderAgda cssPath litRoot tlname md ts = renderHtml (page False tlname cssPath
+                                                      (code False AgdaFileType md litRoot ts))
 
 srcFileOfInterface :: TopLevelModuleName -> Interface -> HtmlInputSourceFile
 srcFileOfInterface m i = HtmlInputSourceFile m (iFileType i) (iSource i) (iHighlighting i)
@@ -98,9 +101,11 @@ page htmlHighlight modName cssPath pageContent =
 
 code :: Bool     -- ^ Whether to generate non-code contents as-is
      -> FileType -- ^ Source file type
+     -> ModuleData
+     -> FilePath   -- ^ Root for Literate links
      -> [TokenInfo]
      -> Html
-code onlyCode fileType = mconcat . if onlyCode
+code onlyCode fileType md litRoot = mconcat . if onlyCode
   then case fileType of
          -- Explicitly written all cases, so people
          -- get compile error when adding new file types
@@ -159,7 +164,7 @@ code onlyCode fileType = mconcat . if onlyCode
     posAttributes :: [Attribute]
     posAttributes = concat
       [ [Attr.id $ stringValue $ show pos ]
-      , toList $ link <$> definitionSite mi
+      , concatMap link (toList . definitionSite $ mi)
       , Attr.class_ (stringValue $ unwords classes) <$ guard (not $ null classes)
       ]
 
@@ -206,11 +211,16 @@ code onlyCode fileType = mconcat . if onlyCode
     mDefSiteAnchor  :: Maybe String
     mDefSiteAnchor  = maybe __IMPOSSIBLE__ defSiteAnchor mDefinitionSite
 
-    link (DefinitionSite m defPos _here _aName) = Attr.href $ stringValue $
-      -- If the definition site points to the top of a file,
-      -- we drop the anchor part and just link to the file.
-      applyUnless (defPos <= 1)
-        (++ "#" ++
-         Network.URI.Encode.encode (show defPos))
-         -- Network.URI.Encode.encode (fromMaybe (show defPos) aName)) -- Named links disabled
-        (Network.URI.Encode.encode $ modToFile m "html")
+    link :: DefinitionSite -> [Attribute]
+    link (DefinitionSite m defPos _here _aName) = case HM.lookup (pack.render.pretty$m) md of
+      Just (AgdaFileType, _) -> [Attr.href $ stringValue $
+        -- If the definition site points to the top of a file,
+        -- we drop the anchor part and just link to the file.
+        applyUnless (defPos <= 1)
+          (++ "#" ++
+           Network.URI.Encode.encode (show defPos))
+           -- Network.URI.Encode.encode (fromMaybe (show defPos) aName)) -- Named links disabled
+          (Network.URI.Encode.encode $ modToFile m "html")]
+      Just (TreeFileType, it) -> let lstr = unpack (maybe (pack.render.pretty$m) id $ getSubtree it defPos)
+                                 in [Attr.href $ stringValue $ litRoot <> lstr]
+      _ -> []

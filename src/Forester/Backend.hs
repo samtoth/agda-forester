@@ -57,6 +57,7 @@ data ForesterOpts = Opts
   , optsHtmlDir :: FilePath
   , optsHtmlLinkRoot :: FilePath
   , optsHtmlCssPath :: FilePath
+  , optsForestRoot :: FilePath
   -- , optsStructured :: FStructured
   } deriving (Generic, NFData)
 
@@ -67,6 +68,7 @@ defaultOps = Opts
   , optsHtmlDir = "assets/html"
   , optsHtmlLinkRoot = "/html/"
   , optsHtmlCssPath = "Agda.css"
+  , optsForestRoot = "/"
   -- , optsStructured = FSNone
   }
 
@@ -140,6 +142,9 @@ fFlags =
   , Option [] ["fhtml-css-path"] (OptArg (\r o -> case r of
       Just d -> return o{optsHtmlCssPath = d}
       Nothing -> return o) "DIR") "Path to css file in HTML files (default: Agda.css)"
+  , Option [] ["fforest-root"] (OptArg (\r o -> case r of
+      Just d -> return o{optsForestRoot = d}
+      Nothing -> return o) "DIR") "Path to root of Forest (default: /)"
   ]
 
 
@@ -224,7 +229,8 @@ foresterPostModule cenv menv _main tlname defs' = do
       hm <- liftIO $ readIORef (compileMods cenv)
       ds <- liftIO $ readIORef (compileForestData cenv)
       let content = renderAgda (optsHtmlCssPath . compileEnvOpts $ cenv)
-                               tlname (tokenStream src hinfo)
+                               (optsForestRoot . compileEnvOpts $ cenv)
+                               tlname hm (tokenStream src hinfo)
                     -- TODO: Links are broken for this - they always point to html, even
                     --       if literate
       let root = (optsHtmlDir . compileEnvOpts $ cenv )
