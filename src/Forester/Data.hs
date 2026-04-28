@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings, FlexibleInstances #-}
 module Forester.Data where
 
-import Agda.Compiler.Backend hiding (topLevelModuleName, Name, Constructor)
+import Agda.Compiler.Backend hiding (topLevelModuleName, Name, Constructor, (.=))
 import Agda.Syntax.Common.Pretty
 import Agda.Syntax.Position
 import Agda.Syntax.Internal
@@ -19,7 +19,7 @@ import qualified Data.Text as T
 
 data FInfo = FInfo
   { fqname :: QName
-  , ftId   :: Maybe T.Text 
+  , ftId   :: Maybe T.Text
   , fty    :: Type
   }
 
