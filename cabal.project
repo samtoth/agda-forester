@@ -1,1 +1,8 @@
 packages: ./*.cabal
+
+-- Agda 2.9.0 is not yet on Hackage; pin to an upstream commit
+-- on agda/agda master that ships Agda.cabal version 2.9.0.
+source-repository-package
+  type: git
+  location: https://github.com/agda/agda.git
+  tag: 2a4399490995b25f5f44c9d91732ab0d4fd06c0e
