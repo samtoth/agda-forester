@@ -4,3 +4,4 @@ trees
 **/*.agdai
 .DS_Store
 .vscode
+result
