@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings, FlexibleInstances #-}
+{-# LANGUAGE OverloadedStrings, FlexibleInstances, DeriveGeneric, DeriveAnyClass #-}
 module Forester.Data where
 
 import Agda.Compiler.Backend hiding (topLevelModuleName, Name, Constructor, (.=))
@@ -13,6 +13,10 @@ import Agda.Interaction.JSON hiding (text)
 import qualified Data.Aeson.Encoding as JSON (text)
 
 import Data.HashMap.Strict (HashMap)
+import Data.IORef
+
+import GHC.Generics
+import Control.DeepSeq
 
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -40,7 +44,7 @@ data IntervalTree = IntTree
 
 instance FromJSON IntervalTree where
   parseJSON = withObject "IntervalTree" $ \v ->
-      IntTree <$> v .: "name" <*> v .: "start_pos" <*> v .: "end_pos" <*> v .: "children" 
+      IntTree <$> v .: "name" <*> v .: "start_pos" <*> v .: "end_pos" <*> v .: "children"
 
 instance ToJSON IntervalTree where
   toJSON (IntTree id sp ep cs) = object ["name" .= id, "start_pos" .= sp, "end_pos" .= ep, "children" .= cs]
@@ -50,7 +54,54 @@ instance FromJSON FileType where
 
 getSubtree :: [IntervalTree] -> Int -> Maybe T.Text
 getSubtree [] _ = Nothing
-getSubtree ((IntTree tid (_,sp) (_,ep) cp):xs) os 
-  = if os >= sp && os <= ep 
-    then maybe (Just tid) Just $ getSubtree cp os 
+getSubtree ((IntTree tid (_,sp) (_,ep) cp):xs) os
+  = if os >= sp && os <= ep
+    then maybe (Just tid) Just $ getSubtree cp os
     else getSubtree xs os
+
+
+data ForesterOpts = Opts
+  { optsEnabled :: Bool
+  , optsTreeDir :: FilePath
+  , optsHtmlDir :: FilePath
+  , optsHtmlLinkRoot :: FilePath
+  , optsHtmlCssPath :: FilePath
+  , optsForestRoot :: FilePath
+  , optsEnableBacklinks :: Bool
+  -- , optsStructured :: FStructured
+  } deriving (Generic, NFData)
+
+defaultOps :: ForesterOpts
+defaultOps = Opts
+  { optsEnabled = False
+  , optsTreeDir = "trees"
+  , optsHtmlDir = "assets/html"
+  , optsHtmlLinkRoot = "/html/"
+  , optsHtmlCssPath = "Agda.css"
+  , optsForestRoot = "/"
+  , optsEnableBacklinks = True
+  -- , optsStructured = FSNone
+  }
+
+data ForesterIdent = ForesterIdent
+
+data CompEnv = CompEnv
+  { compileEnvOpts     :: ForesterOpts
+  , compileForestData  :: IORef (HashMap Text FInfo)
+  , compileMods        :: IORef ModuleData
+  }
+
+data ModuleEnv = ModuleEnv
+  { modEnvCompileEnv :: CompEnv
+  , modEnvName       :: TopLevelModuleName
+  }
+
+data ForesterModule = ForesterModule
+  {
+  }
+
+data CodeGenEnv = CodeGenEnv
+  { cgOpts :: ForesterOpts
+  , cgMods :: ModuleData
+  , cgForestData :: HashMap Text FInfo
+  }

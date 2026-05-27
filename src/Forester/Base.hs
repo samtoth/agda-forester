@@ -32,7 +32,6 @@ import Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as HM
 
 
-
 data ForesterDef = ForesterDef
     { foresterDefTree :: ForesterMeta
     , foresterDefId   :: Text
@@ -48,8 +47,8 @@ type TokenInfo =
 aspectsTokenInfo :: TokenInfo -> Aspects
 aspectsTokenInfo (_,_,a) = a
 
-codeTree :: FilePath -> HashMap Text FInfo -> ModuleData -> [TokenInfo] -> String
-codeTree htmlLink ds hm = join . fmap mkTree . splitByMarkup where
+codeTree :: CodeGenEnv -> [TokenInfo] -> String
+codeTree cenv = join . fmap mkTree . splitByMarkup where
 
   splitByMarkup :: [TokenInfo] -> [[TokenInfo]]
   splitByMarkup = splitWhen $ (== Just Markup) . aspect . aspectsTokenInfo
@@ -61,22 +60,22 @@ codeTree htmlLink ds hm = join . fmap mkTree . splitByMarkup where
     where
       containsCode = any ((/= Just Background) . aspect . aspectsTokenInfo) tokens
 
-      formatCode = render . pretty $ Command "agda" [Raw . pack . mconcat $ fTok htmlLink ds hm <$> tokens] -- $ mconcat $ backgroundOrAgdaToHtml <$> tokens
+      formatCode = render . pretty $ Command "agda" [Raw . pack . mconcat $ fTok cenv <$> tokens] -- $ mconcat $ backgroundOrAgdaToHtml <$> tokens
       formatNonCode = mconcat $ backgroundOrAgdaToTree <$> tokens
 
   backgroundOrAgdaToTree :: TokenInfo -> String
   backgroundOrAgdaToTree token@(_, s, mi) = case aspect mi of
     Just Background -> s
     Just Markup     -> __IMPOSSIBLE__
-    _               -> fTok htmlLink ds hm token
+    _               -> fTok cenv token
 
 -- | Converts module names to the corresponding HTML file names.
 
 modToFile :: TopLevelModuleName -> String -> FilePath
 modToFile m ext = Network.URI.Encode.encode $ render (pretty m) <.> ext
 
-fTok :: FilePath -> HashMap Text FInfo -> ModuleData -> TokenInfo -> String
-fTok htmlLink defSrc md (pos, cont, asp) = appEndo (mconcat $ fmap (\c -> Endo (\x -> "\\" ++ c ++ "{" ++ x ++ "}")) classes <> annotate) $ filterC =<< cont where
+fTok :: CodeGenEnv -> TokenInfo -> String
+fTok cenv (pos, cont, asp) = appEndo (mconcat $ fmap (\c -> Endo (\x -> "\\" ++ c ++ "{" ++ x ++ "}")) classes <> annotate) $ filterC =<< cont where
 
   filterC :: Char -> String
   filterC '(' = "\\lpar{}"
@@ -111,7 +110,7 @@ fTok htmlLink defSrc md (pos, cont, asp) = appEndo (mconcat $ fmap (\c -> Endo (
   noteClasses _s = []
 
   link :: DefinitionSite -> [String -> String]
-  link (DefinitionSite m defPos _here aName) = case HM.lookup (pack.render.pretty$m) md of
+  link (DefinitionSite m defPos _here aName) = case HM.lookup (pack.render.pretty$m) (cgMods cenv) of
       Just (AgdaFileType, _) ->
         -- If the definition site points to the top of a file,
         -- we drop the anchor part and just link to the file.
@@ -120,8 +119,10 @@ fTok htmlLink defSrc md (pos, cont, asp) = appEndo (mconcat $ fmap (\c -> Endo (
                     (show defPos))
                     -- Network.URI.Encode.encode (fromMaybe (show defPos) aName)) -- Named links disabled
                     (Network.URI.Encode.encode $ modToFile m "html")
-        in [\s -> "[" <> s <> "]" <> "(" <> htmlLink <> l <> ")"]
-      Just (TreeFileType, it) -> [\s -> "[" <> s <> "]" <> "(" <> unpack (maybe (pack.render.pretty$m) id $ getSubtree it defPos) <> ")"]
+        in [\s -> "[" <> s <> "]" <> "(" <> (optsHtmlLinkRoot . cgOpts $ cenv) <> l <> ")"]
+      Just (TreeFileType, it) -> case (optsEnableBacklinks . cgOpts $ cenv) of
+        True -> [\s -> "[" <> s <> "]" <> "(" <> unpack (maybe (pack.render.pretty$m) id $ getSubtree it defPos) <> ")"]
+        False -> [\s -> "[" <> s <> "]" <> "(" <> (optsForestRoot . cgOpts $ cenv) <> unpack (maybe (pack.render.pretty$m) id $ getSubtree it defPos) <> ")"]
       _ -> []
 
   -- Are we at the definition site now?

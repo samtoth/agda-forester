@@ -51,45 +51,6 @@ import Data.Maybe (fromMaybe)
 -- import qualified Agda.Interaction.
 
 
-data ForesterOpts = Opts
-  { optsEnabled :: Bool
-  , optsTreeDir :: FilePath
-  , optsHtmlDir :: FilePath
-  , optsHtmlLinkRoot :: FilePath
-  , optsHtmlCssPath :: FilePath
-  , optsForestRoot :: FilePath
-  -- , optsStructured :: FStructured
-  } deriving (Generic, NFData)
-
-defaultOps :: ForesterOpts
-defaultOps = Opts
-  { optsEnabled = False
-  , optsTreeDir = "trees"
-  , optsHtmlDir = "assets/html"
-  , optsHtmlLinkRoot = "/html/"
-  , optsHtmlCssPath = "Agda.css"
-  , optsForestRoot = "/"
-  -- , optsStructured = FSNone
-  }
-
-data ForesterIdent = ForesterIdent
-
-data CompEnv = CompEnv
-  { compileEnvOpts     :: ForesterOpts
-  , compileForestData  :: IORef (HashMap Text FInfo)
-  , compileMods        :: IORef ModuleData
-  }
-
-data ModuleEnv = ModuleEnv
-  { modEnvCompileEnv :: CompEnv
-  , modEnvName       :: TopLevelModuleName
-  }
-
-data ForesterModule = ForesterModule
-  {
-  }
-
-
 foresterBackend :: Backend
 foresterBackend = Backend foresterBackend'
 
@@ -145,6 +106,7 @@ fFlags =
   , Option [] ["fforest-root"] (OptArg (\r o -> case r of
       Just d -> return o{optsForestRoot = d}
       Nothing -> return o) "DIR") "Path to root of Forest (default: /)"
+  , Option [] ["fdisable-backlinks"] (NoArg $ \o -> return o{optsEnableBacklinks = False}) "Disable backlinks in generated tree files (use html links instead)"
   ]
 
 
@@ -243,7 +205,7 @@ foresterPostModule cenv menv _main tlname defs' = do
       liftIO $ modifyIORef (compileMods cenv) (HM.insert (pack.render.pretty$tlname) (ftype, cs))
       hm <- liftIO $ readIORef (compileMods cenv)
       ds <- liftIO $ readIORef (compileForestData cenv)
-      let content = codeTree (optsHtmlLinkRoot . compileEnvOpts $ cenv) ds hm (tokenStream src hinfo)
+      let content = codeTree (CodeGenEnv (compileEnvOpts cenv) hm ds) (tokenStream src hinfo)
       let root = (optsTreeDir . compileEnvOpts $ cenv )
       liftIO $ UTF8.writeTextToFile (root </> render (pretty tlname) <.> "tree") $ T.pack $ content
       liftIO $ putStrLn $ "Written " <> render (pretty tlname) <> " to " <> (root </> render (pretty tlname) <.> "tree")
