@@ -17,10 +17,10 @@ with access to the `agda-forester` command.
 ### Without nix
 
 To use this project without nix, you will need to first have
- [cabal](https://www.haskell.org/cabal/) and
- [treelist](https://github.com/samtoth/treelist) installed. This is a small
-utility to help generate correct links in the Agda code. Then clone the repo and
-install with `cabal install`.
+[cabal](https://www.haskell.org/cabal/) and
+[treelist](https://github.com/samtoth/treelist) installed. The latter is a
+small utility to help generate correct links in the Agda code. Then clone the
+repo and install with `cabal install`.
 
 ## Usage
 
