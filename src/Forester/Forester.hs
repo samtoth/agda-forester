@@ -11,7 +11,7 @@ import Data.Text (Text)
 import Agda.Syntax.Common.Pretty
 
 data Tree = Tree
-    { treeId :: Maybe Text -- ^ Nothing for anonymouse subtrees
+    { treeId :: Maybe Text -- ^ Nothing for anonymous subtrees
     , treeMeta   :: ForesterMeta
     , treeContent :: ForesterContent
     }
@@ -23,12 +23,12 @@ emptyTree = Tree
     , treeContent = []
     }
 
-data ForesterMeta = Meta 
+data ForesterMeta = Meta
     { title   :: Maybe Text
     , author  :: [Text]
     , taxon   :: Maybe Text
     , date    :: Maybe Text
-    , meta    :: [(Text,Text)]  
+    , meta    :: [(Text,Text)]
     }
 
 emptyMeta :: ForesterMeta
@@ -45,20 +45,20 @@ data ForesterContent'
     | Command Text ForesterContent
     | Subtree Tree
     | Link Text (Maybe Text)
-    
+
 ul, ol :: [ForesterContent] -> ForesterContent'
 ul cs = Command "ul" $ fmap (Command "li") cs
 ol cs = Command "ol" $ fmap (Command "li") cs
 
 transclude :: Text -> ForesterContent'
-transclude = Command "transclude" . (:[]) . Raw 
+transclude = Command "transclude" . (:[]) . Raw
 
 
 type ForesterContent = [ForesterContent']
 
 instance Pretty ForesterContent' where
   pretty (Raw t) = pretty t
-  pretty (Command t c) 
+  pretty (Command t c)
     = char '\\' <> pretty t
         <> braces (vcat (pretty <$> c))
   pretty (Subtree tree)
@@ -70,7 +70,7 @@ instance Pretty ForesterContent' where
 
 
 metaToContent :: ForesterMeta -> ForesterContent
-metaToContent (Meta title auth txn dt mt) = 
+metaToContent (Meta title auth txn dt mt) =
   let (<$:>) :: Maybe a -> [a] -> [a]
       Just x <$:> ys = x : ys
       Nothing <$:> ys = ys
@@ -83,6 +83,6 @@ metaToContent (Meta title auth txn dt mt) =
 instance Pretty Tree where
   -- pretty :: Tree -> Doc
   pretty :: Tree -> Doc
-  pretty (Tree _ meta content) 
+  pretty (Tree _ meta content)
    = vcat (pretty <$> metaToContent meta) $+$
      vcat (pretty <$> content)
