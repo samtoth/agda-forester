@@ -28,7 +28,7 @@ import Agda.Syntax.Common.Pretty
 import Agda.Syntax.Common (FileType(..))
 import Agda.Interaction.Highlighting.Precise (HighlightingInfo)
 import Agda.Interaction.Options (ArgDescr(..), OptDescr(..))
-import Agda.Utils.Monad (join)
+import Agda.Utils.Monad (join, forM_, when)
 import Agda.Utils.Maybe (isJust)
 import Agda.Utils.FileName
 import Agda.Utils.Impossible
@@ -107,6 +107,7 @@ fFlags =
       Just d -> return o{optsForestRoot = d}
       Nothing -> return o) "DIR") "Path to root of Forest (default: /)"
   , Option [] ["fdisable-backlinks"] (NoArg $ \o -> return o{optsEnableBacklinks = False}) "Disable backlinks in generated tree files (use html links instead)"
+  , Option [] ["fno-index-trees"] (NoArg $ \o -> return o{optsGenIndexTrees = False}) "Don't generate module index trees"
   ]
 
 
@@ -213,10 +214,20 @@ foresterPostModule cenv menv _main tlname defs' = do
   return $ ForesterModule
 
 -- Post compile we will write the forester defs to disk to use next time
+-- and if the setting is enbaled will write the module index tree
 foresterPostCompile :: CompEnv
                     -> IsMain
                     -> Map.Map TopLevelModuleName ForesterModule
                     -> TCMT IO ()
 foresterPostCompile cenv main mods = do
-  types <- liftIO $ readIORef (compileMods cenv)
-  liftIO $ JSON.encodeFile "forest-map.json" types
+  modData <- liftIO $ readIORef (compileMods cenv)
+  liftIO $ JSON.encodeFile "forest-map.json" modData
+  when (optsGenIndexTrees . compileEnvOpts $ cenv) $ do
+    -- trees : [{treeID : TopLevelModuleName, content: Tree}]
+    let trees = genIndexTrees modData
+    forM_ trees $ \(modname, content) -> do
+      let root = optsTreeDir . compileEnvOpts $ cenv
+      let path = root </> render (pretty modname) <> "-index" <.> "tree"
+      liftIO $ UTF8.writeTextToFile path $ T.pack $ render (pretty content)
+      liftIO $ putStrLn $ "Written " <> render (pretty modname) <> " to " <> path
+
