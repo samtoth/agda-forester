@@ -198,7 +198,6 @@ genNamespaces = f "" . fmap (Data.Text.splitOn ".")
         [(prefix <> name <> "." <> x) | [x] <- tails]
         (f (prefix <> name <> ".") [xs | xs@(_ : xs') <- tails, not (null xs')])
     | (name, tails) <- groups mods]
-  where
 
   -- Get top level mods
   tl :: [[Text]] -> [Text]
