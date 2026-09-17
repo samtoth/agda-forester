@@ -84,6 +84,7 @@ fTok cenv (pos, cont, asp) = appEndo (mconcat $ fmap (\c -> Endo (\x -> "\\" ++ 
   filterC '}' = "\\rbrace{}"
   filterC '[' = "\\lbrack{}"
   filterC ']' = "\\rbrack{}"
+  filterC '#' = "\\hash{}"
   filterC s = s:[]
 
   classes = concat
