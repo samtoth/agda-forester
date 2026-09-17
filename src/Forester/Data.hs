@@ -68,6 +68,7 @@ data ForesterOpts = Opts
   , optsHtmlCssPath :: FilePath
   , optsForestRoot :: FilePath
   , optsEnableBacklinks :: Bool
+  , optsGenIndexTrees :: Bool
   -- , optsStructured :: FStructured
   } deriving (Generic, NFData)
 
@@ -80,6 +81,7 @@ defaultOps = Opts
   , optsHtmlCssPath = "Agda.css"
   , optsForestRoot = "/"
   , optsEnableBacklinks = True
+  , optsGenIndexTrees = True
   -- , optsStructured = FSNone
   }
 

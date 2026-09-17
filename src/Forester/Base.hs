@@ -1,17 +1,18 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE LambdaCase #-}
 module Forester.Base where
 
 import Data.Monoid (Endo(..))
 import Data.Foldable (toList)
 import Data.List.Split
 import qualified Data.Text.Lazy as T
-import Data.Text (Text, pack, unpack)
+import Data.Text (Text, pack, unpack, splitOn)
 import qualified Data.List as List
 import qualified Data.IntMap as IntMap
 
-import Control.Monad (join)
+import Control.Monad (join, (<=<))
 import Control.Monad.State
 
 import Agda.Compiler.Backend hiding (topLevelModuleName, Name, Constructor)
@@ -164,7 +165,6 @@ splitDef = fmap help
 
 
 -- | Constructs token stream ready to print.
-
 tokenStream
   :: T.Text             -- ^ The contents of the module.
   -> HighlightingInfo -- ^ Highlighting information.
@@ -178,3 +178,70 @@ tokenStream contents info =
   zipWith (\pos c -> (IntMap.lookup pos infoMap, (pos, c))) [1..] (T.unpack contents)
   where
   infoMap = toMap info
+
+-- | Namespace nspcName _ subNamespaces
+data Namespace a = Namespace
+  { namespaceId :: Text
+  , namespaceContent :: a
+  , namespaceSubNs :: [Namespace a]
+  }
+  deriving Show
+
+
+
+genNamespaces :: [Text] -> [Namespace [Text]]
+genNamespaces = f "" . fmap (Data.Text.splitOn ".")
+  where
+  f :: Text -> [[Text]] -> [Namespace [Text]]
+  f prefix mods =
+    [ Namespace (prefix <> name)
+        [(prefix <> name <> "." <> x) | [x] <- tails]
+        (f (prefix <> name <> ".") [xs | xs@(_ : xs') <- tails, not (null xs')])
+    | (name, tails) <- groups mods]
+
+  -- Get top level mods
+  tl :: [[Text]] -> [Text]
+  tl = List.nub
+     . join
+     . fmap (\case
+                [] -> []
+                (a:_) -> [a])
+
+  -- groups xs = [(mod, [tail]), ...]
+  groups :: [[Text]] -> [(Text, [[Text]])]
+  groups mods =
+    [ (tl, fmap tail submods)
+    | tl <- tl mods
+    , let submods = List.filter (\case
+                                    [] -> False
+                                    (a:_) -> a == tl) mods]
+
+
+-- | genTrees (Namespace name directSumods subNs) = Namespace name tree [submodules with trees]
+genTrees :: Namespace [Text] -> Namespace Tree
+genTrees (Namespace name submods ns)
+  = Namespace name tree subNs where
+  subNs :: [Namespace Tree]
+  subNs = List.sortOn namespaceId $ fmap genTrees ns
+
+  tree = Tree
+    { treeId = Just (name <> "-index")
+    , treeMeta = Meta
+        { title = Just name
+        , author = []
+        , taxon = Just "Namespace"
+        , date = Nothing
+        , meta = []
+        }
+    , treeContent = ul (fmap (\sm -> [Link sm Nothing]) (List.sort submods)) : (fmap (transclude . (<> "-index") . namespaceId) subNs)
+    }
+
+flattenNamespaces :: Namespace a -> [(Text, a)]
+flattenNamespaces (Namespace name a ns) = (name, a) : (flattenNamespaces =<< ns)
+
+-- | Generates index pages
+genIndexTrees :: ModuleData -> [(Text, Tree)]
+genIndexTrees md =
+  let namespaces = filter (\(Namespace name _ _) -> name /= "Agda" && name /= "Everything") $ genNamespaces (HM.keys md)
+  in flattenNamespaces $ genTrees (Namespace "Everything" [] namespaces)
+
