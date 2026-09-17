@@ -188,23 +188,6 @@ data Namespace a = Namespace
   deriving Show
 
 
--- Get top level mods
-tl :: [[Text]] -> [Text]
-tl = List.nub
-   . join
-   . fmap (\case
-              [] -> []
-              (a:_) -> [a])
-
--- groups xs = [(mod, [tail]), ...]
-groups :: [[Text]] -> [(Text, [[Text]])]
-groups mods =
-  [ (tl, fmap tail submods)
-  | tl <- tl mods
-  , let submods = List.filter (\case
-                                  [] -> False
-                                  (a:_) -> a == tl) mods]
-
 
 genNamespaces :: [Text] -> [Namespace [Text]]
 genNamespaces = f "" . fmap (Data.Text.splitOn ".")
@@ -215,6 +198,24 @@ genNamespaces = f "" . fmap (Data.Text.splitOn ".")
         [(prefix <> name <> "." <> x) | [x] <- tails]
         (f (prefix <> name <> ".") [xs | xs@(_ : xs') <- tails, not (null xs')])
     | (name, tails) <- groups mods]
+  where
+
+  -- Get top level mods
+  tl :: [[Text]] -> [Text]
+  tl = List.nub
+     . join
+     . fmap (\case
+                [] -> []
+                (a:_) -> [a])
+
+  -- groups xs = [(mod, [tail]), ...]
+  groups :: [[Text]] -> [(Text, [[Text]])]
+  groups mods =
+    [ (tl, fmap tail submods)
+    | tl <- tl mods
+    , let submods = List.filter (\case
+                                    [] -> False
+                                    (a:_) -> a == tl) mods]
 
 
 -- | genTrees (Namespace name directSumods subNs) = Namespace name tree [submodules with trees]
@@ -222,7 +223,7 @@ genTrees :: Namespace [Text] -> Namespace Tree
 genTrees (Namespace name submods ns)
   = Namespace name tree subNs where
   subNs :: [Namespace Tree]
-  subNs = fmap genTrees ns
+  subNs = List.sortOn namespaceId $ fmap genTrees ns
 
   tree = Tree
     { treeId = Just (name <> "-index")
@@ -233,7 +234,7 @@ genTrees (Namespace name submods ns)
         , date = Nothing
         , meta = []
         }
-    , treeContent = ul (fmap (\sm -> [Link sm Nothing]) submods) : (fmap (transclude . (<> "-index") . namespaceId) subNs)
+    , treeContent = ul (fmap (\sm -> [Link sm Nothing]) (List.sort submods)) : (fmap (transclude . (<> "-index") . namespaceId) subNs)
     }
 
 flattenNamespaces :: Namespace a -> [(Text, a)]
