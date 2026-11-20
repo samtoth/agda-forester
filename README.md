@@ -5,8 +5,7 @@ literate agda to forester trees.
 
 ## Building
 
-The project is compatible with Forester 5, and bundles Agda nightly version
-f369741 with it.
+The project is compatible with Forester 5 and bundles Agda 2.9.0.
 
 ### With nix
 
